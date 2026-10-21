@@ -1,5 +1,6 @@
 // Firebase版:Googleログイン、Firestoreへの保存、通知の受け取り登録
 import { SHARE_DEFAULTS } from './cycle.js';
+import { PILL_DEFAULTS } from './pill.js';
 
 const V = '11.0.2';
 const CDN = `https://www.gstatic.com/firebasejs/${V}/`;
@@ -80,30 +81,39 @@ export async function createFirebaseBackend(config, vapidKey) {
     async loadProfile() {
       const ref = doc(db, 'users', me());
       const snap = await getDoc(ref);
-      const base = { name: (current && current.name) || '', mode: 'owner', following: null, settings: { notifyDaysBefore: 3 }, share: { ...SHARE_DEFAULTS } };
+      const base = { name: (current && current.name) || '', mode: 'owner', following: null, settings: { notifyDaysBefore: 3 }, share: { ...SHARE_DEFAULTS }, pill: { ...PILL_DEFAULTS } };
       if (!snap.exists()) {
         await setDoc(ref, base);
         return base;
       }
       const d = snap.data();
-      return { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}) }, share: { ...base.share, ...(d.share || {}) } };
+      return { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}) }, share: { ...base.share, ...(d.share || {}) }, pill: { ...base.pill, ...(d.pill || {}) } };
     },
     async saveProfile(patch) { await setDoc(doc(db, 'users', me()), patch, { merge: true }); },
 
     watchOwnData(cb) {
-      let periods = null;
-      let days = null;
-      const emit = () => { if (periods && days) cb({ periods, days }); };
-      const u1 = onSnapshot(collection(db, 'users', me(), 'periods'), (s) => {
-        periods = s.docs.map((d) => ({ id: d.id, ...d.data() }));
-        emit();
-      });
-      const u2 = onSnapshot(collection(db, 'users', me(), 'days'), (s) => {
-        days = Object.fromEntries(s.docs.map((d) => [d.id, d.data().symptoms || []]));
-        emit();
-      });
-      return () => { u1(); u2(); };
+      const parts = { periods: null, days: null, pills: null, appts: null };
+      const emit = () => { if (Object.values(parts).every((v) => v !== null)) cb({ ...parts }); };
+      const col = (name) => collection(db, 'users', me(), name);
+      const subs = [
+        onSnapshot(col('periods'), (s) => { parts.periods = s.docs.map((d) => ({ id: d.id, ...d.data() })); emit(); }),
+        onSnapshot(col('days'), (s) => { parts.days = Object.fromEntries(s.docs.map((d) => [d.id, d.data().symptoms || []])); emit(); }),
+        onSnapshot(col('pills'), (s) => { parts.pills = Object.fromEntries(s.docs.map((d) => [d.id, true])); emit(); }),
+        onSnapshot(col('appointments'), (s) => { parts.appts = s.docs.map((d) => ({ id: d.id, ...d.data() })); emit(); }),
+      ];
+      return () => subs.forEach((u) => u());
     },
+    async setPill(date, taken) {
+      const ref = doc(db, 'users', me(), 'pills', date);
+      if (taken) await setDoc(ref, { takenAt: serverTimestamp() });
+      else await deleteDoc(ref);
+    },
+    async saveAppointment(a) {
+      const { id, ...data } = a;
+      if (id) await setDoc(doc(db, 'users', me(), 'appointments', id), data);
+      else await addDoc(collection(db, 'users', me(), 'appointments'), data);
+    },
+    async deleteAppointment(id) { await deleteDoc(doc(db, 'users', me(), 'appointments', id)); },
     async addPeriod(p) {
       const r = await addDoc(collection(db, 'users', me(), 'periods'), { start: p.start, end: p.end || null });
       return r.id;

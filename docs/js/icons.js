@@ -20,6 +20,11 @@ const P = {
   paste: '<rect x="5" y="4.5" width="14" height="16" rx="3"/><path d="M9 3.5h6v3H9zM8.5 11h7M8.5 14.5h7M8.5 18h4"/>',
   person: '<circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c.8-4 3.8-6 7.5-6s6.7 2 7.5 6"/>',
   swap: '<path d="M5 8.5h13l-3.5-3.5M19 15.5H6l3.5 3.5"/>',
+  pill: '<g transform="rotate(-40 12 12)"><rect x="3.2" y="8.2" width="17.6" height="7.6" rx="3.8"/><path d="M12 8.2v7.6"/></g>',
+  clinic: '<path d="M4.5 20.5V8.5L12 4l7.5 4.5v12"/><path d="M3 20.5h18M12 9.5v5M9.5 12h5"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  edit: '<path d="M5 19l1-4.2 9.6-9.6a2 2 0 0 1 2.9 0l.3.3a2 2 0 0 1 0 2.9L9.2 18z"/><path d="M13.8 7l3.2 3.2"/>',
+  pause: '<path d="M9 6.5v11M15 6.5v11"/>',
   door: '<path d="M14 4.5H6.5v15H14"/><path d="M11 12h9.5M17.5 9l3 3-3 3"/>',
 
   // 症状

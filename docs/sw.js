@@ -1,8 +1,8 @@
 // オフラインでも開けるようにするのと、通知を表示するためのもの
-const CACHE = 'shizuku-v1';
+const CACHE = 'shizuku-v2';
 const SHELL = [
   './', './index.html', './css/style.css', './manifest.webmanifest',
-  './js/app.js', './js/cycle.js', './js/icons.js', './js/config.js', './js/store-demo.js', './js/store-firebase.js',
+  './js/app.js', './js/cycle.js', './js/pill.js', './js/icons.js', './js/config.js', './js/store-demo.js', './js/store-firebase.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/badge-96.png',
 ];
 const CDN_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com', 'www.gstatic.com'];

@@ -80,7 +80,8 @@ export function predict(periods, today, st = stats(periods), n = 3) {
 }
 
 /** 画面に必要なものをまとめて作る */
-export function buildView(periods, days, today) {
+/** pillWindows を渡すとピル中の表示(休薬・偽薬を出血の予定にし、排卵日は出さない) */
+export function buildView(periods, days, today, pillWindows = null) {
   const ps = sortPeriods(periods);
   const st = stats(ps);
   const pr = predict(ps, today, st);
@@ -97,13 +98,18 @@ export function buildView(periods, days, today) {
       actual.push({ id: p.id, start: p.start, end: addDays(p.start, st.avgLen - 1), guessed: true });
     }
   }
-  if (pr) preds.push(...pr.upcoming);
+  if (pillWindows) preds.push(...pillWindows);
+  else if (pr) preds.push(...pr.upcoming);
   const symptoms = {};
   for (const [d, v] of Object.entries(days || {})) if (v && v.length) symptoms[d] = v;
   const last = ps[ps.length - 1];
-  const core = pr
-    ? { openStart: last && isOpen(last, today) ? last.start : null, next: pr.next, nextOriginal: pr.nextOriginal }
-    : null;
+  const openStart = last && isOpen(last, today) ? last.start : null;
+  if (pillWindows) {
+    const w = pillWindows[0] || null;
+    const core = { pill: true, openStart, nextOriginal: w ? w.start : null, next: w ? w.start : null, nextEnd: w ? w.end : null };
+    return { stats: st, actual, preds, fertile: [], symptoms, core, pillMode: true };
+  }
+  const core = pr ? { openStart, next: pr.next, nextOriginal: pr.nextOriginal } : null;
   return { stats: st, actual, preds, fertile: pr ? pr.fertile : [], symptoms, core };
 }
 
@@ -112,6 +118,12 @@ export function statusOf(core, today) {
   if (core.openStart) {
     const d = diffDays(core.openStart, today);
     if (d >= 0 && d <= OPEN_MAX) return { kind: 'period', day: d + 1 };
+  }
+  if (core.pill) {
+    if (!core.nextOriginal) return { kind: 'empty' };
+    const w = diffDays(today, core.nextOriginal);
+    if (w <= 0) return { kind: 'inrest', next: core.nextOriginal, end: core.nextEnd };
+    return { kind: 'wait', days: w, next: core.nextOriginal, pill: true };
   }
   const d = diffDays(today, core.nextOriginal);
   if (d < 0) return { kind: 'late', days: -d, next: core.nextOriginal };
@@ -126,10 +138,10 @@ export function infoFor(view, date) {
   return { actual, pred, fertile, ovulation, symptoms: view.symptoms[date] || [] };
 }
 
-export const SHARE_DEFAULTS = { status: true, fertile: false, history: false, symptoms: false, startNotify: true };
+export const SHARE_DEFAULTS = { status: true, fertile: false, history: false, symptoms: false, pill: false, startNotify: true };
 
 /** 彼氏さんに見せる分だけを取り出す */
-export function buildShared(view, flags, ownerName, today) {
+export function buildShared(view, flags, ownerName, today, extra = null) {
   const data = {};
   if (flags.status) {
     data.core = view.core;
@@ -145,6 +157,14 @@ export function buildShared(view, flags, ownerName, today) {
     const from = addDays(today, -120);
     data.symptoms = Object.fromEntries(Object.entries(view.symptoms).filter(([d]) => d >= from));
   }
+  if (flags.pill && extra && extra.pill) {
+    const from = addDays(today, -60);
+    data.pill = {
+      conf: extra.pill,
+      taken: Object.keys(extra.taken || {}).filter((d) => d >= from && extra.taken[d]).sort(),
+    };
+  }
+  if (!flags.fertile || view.pillMode) delete data.fertile;
   return { ownerName, items: { ...SHARE_DEFAULTS, ...flags }, data, sharedOn: today };
 }
 
@@ -164,6 +184,8 @@ export function viewFromShared(doc, today) {
     fertile: d.fertile || [],
     symptoms: d.symptoms || {},
     core: d.core || null,
+    pillMode: !!(d.core && d.core.pill),
+    pill: d.pill ? { conf: d.pill.conf, taken: Object.fromEntries((d.pill.taken || []).map((x) => [x, true])) } : null,
     items: { ...SHARE_DEFAULTS, ...((doc && doc.items) || {}) },
   };
 }

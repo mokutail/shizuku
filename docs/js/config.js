@@ -21,4 +21,4 @@ export const firebaseConfig = {
 };
 
 // Firebase コンソール →「Cloud Messaging」→「ウェブプッシュ証明書」の鍵ペア
-export const vapidKey = '';
+export const vapidKey = 'BLnw3ej_l0HmLt_o_Jav1H6DFh6I6un2Rx8_JI1CLT27RGS1iV5PsudTMF-jG9DlZ6jeDyODz2aWGnUI0wRaVCQ';

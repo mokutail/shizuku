@@ -12,12 +12,12 @@
 // };
 
 export const firebaseConfig = {
-  apiKey: "AIza...",
-  authDomain: "....firebaseapp.com",
-  projectId: "...",
-  storageBucket: "...",
-  messagingSenderId: "...",
-  appId: "..."
+  apiKey: "AIzaSyDGpyahpkG-28uieGT6fQE91zQJiuKF77U",
+  authDomain: "shizuku-1658b.firebaseapp.com",
+  projectId: "shizuku-1658b",
+  storageBucket: "shizuku-1658b.firebasestorage.app",
+  messagingSenderId: "288829340290",
+  appId: "1:288829340290:web:e5c70ef98eef98e7ab929b"
 };
 
 // Firebase コンソール →「Cloud Messaging」→「ウェブプッシュ証明書」の鍵ペア

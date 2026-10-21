@@ -36,7 +36,7 @@ async function tokensOf(uid) {
   return snap.docs.map((d) => d.id);
 }
 
-async function send(uid, body, tag) {
+async function send(uid, body, tag, extra = {}) {
   const tokens = await tokensOf(uid);
   if (!tokens.length) return 0;
   if (DRY_RUN) {
@@ -45,7 +45,7 @@ async function send(uid, body, tag) {
   }
   const res = await messaging.sendEachForMulticast({
     tokens,
-    data: { title: 'しずく', body, url: APP_URL, tag },
+    data: { title: 'しずく', body, url: APP_URL, tag, ...extra },
     webpush: { headers: { Urgency: 'high', TTL: '21600' } },
   });
   const dead = [];
@@ -80,10 +80,10 @@ for (const u of users.docs) {
       const taken = (await u.ref.collection('pills').doc(d).get()).exists;
       if (taken) continue;
       if (state.pill1 !== d && !patch.pill1) {
-        sent += await send(u.id, 'ピルを飲む時間です。飲んだら「飲んだ」を押してください。', 'pill');
+        sent += await send(u.id, 'ピルを飲む時間です。飲んだら「飲んだ」を押してください。', 'pill', { date: d });
         patch.pill1 = d;
       } else if (pc.remindAfter > 0 && nowMin >= due + pc.remindAfter && state.pill2 !== d) {
-        sent += await send(u.id, `${d === today ? '今日' : '昨日'}のピルの記録がまだありません。飲みわすれていませんか?`, 'pill');
+        sent += await send(u.id, `${d === today ? '今日' : '昨日'}のピルの記録がまだありません。飲んだら「飲んだ」を押してください。`, 'pill', { date: d });
         patch.pill2 = d;
       }
     }

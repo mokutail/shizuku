@@ -102,6 +102,11 @@ async function init() {
     sessionStorage.setItem('shizuku-invite', code);
     history.replaceState(null, '', location.pathname);
   }
+  const pillParam = params.get('pill');
+  if (pillParam && /^\d{4}-\d{2}-\d{2}$/.test(pillParam)) {
+    sessionStorage.setItem('shizuku-pill-taken', pillParam);
+    history.replaceState(null, '', location.pathname);
+  }
   S.invite = sessionStorage.getItem('shizuku-invite');
 
   render();
@@ -168,6 +173,7 @@ function startWatching() {
     S.pills = pills || {};
     S.appts = appts || [];
     S.dataReady = true;
+    applyPillFromNotification();
     syncShared();
     render();
   }));
@@ -1060,6 +1066,19 @@ document.addEventListener('change', (ev) => {
 document.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape' && S.modal) { S.modal = null; render(); }
 });
+
+/** 通知の「飲んだ」ボタンから開いたときに記録する */
+function applyPillFromNotification() {
+  const date = sessionStorage.getItem('shizuku-pill-taken');
+  if (!date) return;
+  sessionStorage.removeItem('shizuku-pill-taken');
+  if (!ownPillOn() || date > S.today || !needsPill(pillDay(S.profile.pill, date))) return;
+  S.tab = 'pill';
+  if (S.pills[date]) { toast('この日のピルはもう記録してあります'); return; }
+  S.pills = { ...S.pills, [date]: true };
+  run(async () => { await S.backend.setPill(date, true); syncShared(); },
+    date === S.today ? '飲んだ記録をつけました' : `${md(date)}のピルを記録しました`);
+}
 
 function savePill(patch, okText) {
   S.profile.pill = { ...pillConf(S.profile.pill), ...patch };

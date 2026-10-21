@@ -11,7 +11,14 @@
 //   appId: "1:1234567890:web:abcdef",
 // };
 
-export const firebaseConfig = null;
+export const firebaseConfig = {
+  apiKey: "AIza...",
+  authDomain: "....firebaseapp.com",
+  projectId: "...",
+  storageBucket: "...",
+  messagingSenderId: "...",
+  appId: "..."
+};
 
 // Firebase コンソール →「Cloud Messaging」→「ウェブプッシュ証明書」の鍵ペア
 export const vapidKey = '';

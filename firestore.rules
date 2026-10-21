@@ -1,0 +1,58 @@
+rules_version = '2';
+
+// しずく の保存ルール
+// ・自分の記録は自分だけが読み書きできる
+// ・共有用のデータは、招待リンクで登録した人だけが読める(書けるのは本人だけ)
+// ・招待リンクは24時間・1人だけ有効
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isMe(uid) { return signedIn() && request.auth.uid == uid; }
+
+    match /users/{uid} {
+      allow read, write: if isMe(uid);
+      match /{sub=**} {
+        allow read, write: if isMe(uid);
+      }
+    }
+
+    match /invites/{code} {
+      // コードを知っている人だけが1件ずつ読める(一覧は不可)
+      allow get: if signedIn();
+      allow create: if signedIn()
+        && code.size() >= 20
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.keys().hasOnly(['owner', 'ownerName', 'expiresAt']);
+      // 招待を受けた人が「使用済み」にする(まだ誰も使っていない場合だけ)
+      allow update: if signedIn()
+        && resource.data.owner != request.auth.uid
+        && resource.data.get('usedBy', null) == null
+        && resource.data.expiresAt > request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedBy'])
+        && request.resource.data.usedBy == request.auth.uid;
+      allow delete: if signedIn() && resource.data.owner == request.auth.uid;
+    }
+
+    match /shared/{owner} {
+      allow read: if isMe(owner)
+        || (signedIn() && exists(/databases/$(database)/documents/shared/$(owner)/viewers/$(request.auth.uid)));
+      allow write: if isMe(owner);
+
+      match /viewers/{viewer} {
+        allow read: if isMe(owner) || isMe(viewer);
+        allow delete: if isMe(owner) || isMe(viewer);
+        allow create: if isMe(viewer)
+          && viewer != owner
+          && request.resource.data.keys().hasOnly(['code', 'name', 'addedAt'])
+          && get(/databases/$(database)/documents/invites/$(request.resource.data.code)).data.owner == owner
+          && get(/databases/$(database)/documents/invites/$(request.resource.data.code)).data.usedBy == viewer;
+      }
+    }
+
+    // 通知の送信記録(通知スクリプト専用。アプリからは触れない)
+    match /notifyState/{uid} {
+      allow read, write: if false;
+    }
+  }
+}

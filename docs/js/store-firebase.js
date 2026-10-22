@@ -145,6 +145,7 @@ export async function createFirebaseBackend(config, vapidKey) {
       const snap = await getDoc(doc(db, 'invites', code));
       if (!snap.exists()) return null;
       const d = snap.data();
+      if (d.app && d.app !== 'shizuku') return null;
       return {
         owner: d.owner,
         ownerName: d.ownerName || '',

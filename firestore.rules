@@ -4,6 +4,7 @@ rules_version = '2';
 // ・自分の記録は自分だけが読み書きできる
 // ・共有用のデータは、招待リンクで登録した人だけが読める(書けるのは本人だけ)
 // ・招待リンクは24時間・1人だけ有効
+// ・「めもり」(体重)の共有は sharedBody で、しずくとは別に招待する
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -23,7 +24,8 @@ service cloud.firestore {
       allow create: if signedIn()
         && code.size() >= 20
         && request.resource.data.owner == request.auth.uid
-        && request.resource.data.keys().hasOnly(['owner', 'ownerName', 'expiresAt']);
+        && request.resource.data.keys().hasOnly(['owner', 'ownerName', 'expiresAt', 'app'])
+        && request.resource.data.get('app', 'shizuku') in ['shizuku', 'memori'];
       // 招待を受けた人が「使用済み」にする(まだ誰も使っていない場合だけ)
       allow update: if signedIn()
         && resource.data.owner != request.auth.uid
@@ -46,7 +48,26 @@ service cloud.firestore {
           && viewer != owner
           && request.resource.data.keys().hasOnly(['code', 'name', 'addedAt'])
           && get(/databases/$(database)/documents/invites/$(request.resource.data.code)).data.owner == owner
-          && get(/databases/$(database)/documents/invites/$(request.resource.data.code)).data.usedBy == viewer;
+          && get(/databases/$(database)/documents/invites/$(request.resource.data.code)).data.usedBy == viewer
+          && get(/databases/$(database)/documents/invites/$(request.resource.data.code)).data.get('app', 'shizuku') == 'shizuku';
+      }
+    }
+
+    // めもり(体重・健診)の共有
+    match /sharedBody/{owner} {
+      allow read: if isMe(owner)
+        || (signedIn() && exists(/databases/$(database)/documents/sharedBody/$(owner)/viewers/$(request.auth.uid)));
+      allow write: if isMe(owner);
+
+      match /viewers/{viewer} {
+        allow read: if isMe(owner) || isMe(viewer);
+        allow delete: if isMe(owner) || isMe(viewer);
+        allow create: if isMe(viewer)
+          && viewer != owner
+          && request.resource.data.keys().hasOnly(['code', 'name', 'addedAt'])
+          && get(/databases/$(database)/documents/invites/$(request.resource.data.code)).data.owner == owner
+          && get(/databases/$(database)/documents/invites/$(request.resource.data.code)).data.usedBy == viewer
+          && get(/databases/$(database)/documents/invites/$(request.resource.data.code)).data.get('app', 'shizuku') == 'memori';
       }
     }
 

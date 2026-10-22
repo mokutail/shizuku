@@ -11,6 +11,7 @@ import { pillConf, isPillOn, pillDay, needsPill } from '../docs/js/pill.js';
 
 const TZ = 'Asia/Tokyo';
 const APP_URL = process.env.APP_URL || './';
+const MEMORI_URL = process.env.APP_URL ? new URL('memori/', process.env.APP_URL).href : './memori/';
 const DRY_RUN = process.env.DRY_RUN === '1';
 
 const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -31,13 +32,15 @@ const daytime = hour >= 8 && hour < 23;
 
 const md = (s) => `${Number(s.slice(5, 7))}/${Number(s.slice(8, 10))}`;
 
-async function tokensOf(uid) {
-  const snap = await db.collection('users').doc(uid).collection('tokens').get();
+async function tokensOf(uid, col) {
+  const snap = await db.collection('users').doc(uid).collection(col).get();
   return snap.docs.map((d) => d.id);
 }
 
-async function send(uid, body, tag, extra = {}) {
-  const tokens = await tokensOf(uid);
+// app: 'shizuku' か 'memori'(それぞれ別の通知の受け取り先)
+async function send(uid, body, tag, extra = {}, app = 'shizuku') {
+  const col = app === 'memori' ? 'memoriTokens' : 'tokens';
+  const tokens = await tokensOf(uid, col);
   if (!tokens.length) return 0;
   if (DRY_RUN) {
     console.log(`[dry-run] ${uid}: ${body}`);
@@ -45,7 +48,7 @@ async function send(uid, body, tag, extra = {}) {
   }
   const res = await messaging.sendEachForMulticast({
     tokens,
-    data: { title: 'しずく', body, url: APP_URL, tag, ...extra },
+    data: { title: app === 'memori' ? 'めもり' : 'しずく', body, url: app === 'memori' ? MEMORI_URL : APP_URL, tag, ...extra },
     webpush: { headers: { Urgency: 'high', TTL: '21600' } },
   });
   const dead = [];
@@ -53,7 +56,7 @@ async function send(uid, body, tag, extra = {}) {
     const code = r.error && r.error.code;
     if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') dead.push(tokens[i]);
   });
-  await Promise.all(dead.map((t) => db.collection('users').doc(uid).collection('tokens').doc(t).delete()));
+  await Promise.all(dead.map((t) => db.collection('users').doc(uid).collection(col).doc(t).delete()));
   return res.successCount;
 }
 
@@ -62,11 +65,28 @@ let sent = 0;
 
 for (const u of users.docs) {
   const profile = u.data();
-  if (profile.mode === 'partner') continue;
-
   const stateRef = db.collection('notifyState').doc(u.id);
   const state = (await stateRef.get()).data() || {};
   const patch = {};
+
+  // ---- めもり:体重をはかる通知
+  const mem = (await u.ref.collection('meta').doc('memori').get()).data();
+  if (mem && mem.mode !== 'partner' && mem.remind && mem.remind.on) {
+    const [rh, rm] = String(mem.remind.time || '07:30').split(':').map(Number);
+    const due = toNum(today) * 1440 + rh * 60 + rm;
+    if (nowMin >= due && nowMin < due + 180 && state.weighFor !== today) {
+      const recorded = (await u.ref.collection('weights').doc(today).get()).exists;
+      if (!(recorded && mem.remind.skipIfRecorded)) {
+        sent += await send(u.id, recorded ? '今日の体重は記録ずみです。' : '体重をはかる時間です。', 'weigh', {}, 'memori');
+      }
+      patch.weighFor = today;
+    }
+  }
+
+  if (profile.mode === 'partner') {
+    if (Object.keys(patch).length && !DRY_RUN) await stateRef.set({ ...patch, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    continue;
+  }
   const pc = pillConf(profile.pill);
   const pillOn = isPillOn(pc);
 

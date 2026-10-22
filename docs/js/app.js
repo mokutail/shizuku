@@ -4,6 +4,7 @@ import {
   buildShared, viewFromShared, parseBulk, SHARE_DEFAULTS, OPEN_MAX,
 } from './cycle.js';
 import { icon, dropShape, leafMark, SYMPTOMS, SYMPTOM_LABEL } from './icons.js';
+import { appSwitch } from './switch.js';
 import {
   PILL_TYPES, pillConf, isPillOn, pillDay, needsPill, restWindows, sheetDates, missedCount,
 } from './pill.js';
@@ -221,7 +222,7 @@ function render() {
 }
 
 function shell(main, tabs) {
-  return `<div class="shell">${S.backend && S.backend.isDemo ? '<p class="demo-band">デモモード:データはこの端末の中だけに保存されます</p>' : ''}<main class="screen">${main}</main>${tabs}</div>`;
+  return `<div class="shell">${S.backend && S.backend.isDemo ? '<p class="demo-band">デモモード:データはこの端末の中だけに保存されます</p>' : ''}<main class="screen">${appSwitch('cycle', './')}${main}</main>${tabs}</div>`;
 }
 
 function screenLoading() {
@@ -290,7 +291,7 @@ function partnerScreen() {
   if (S.tab === 'settings') return partnerSettings();
   if (!S.sharedReady) return screenLoading();
   if (!S.shared) {
-    return `<header class="topbar"><span class="brand">しずく</span></header>
+    return `
       <div class="empty-block">${dropShape('pred')}<p>まだ共有された内容がありません。お相手がアプリを開くと、ここに表示されます。</p></div>`;
   }
   return calendarScreen(viewFromShared(S.shared, S.today), { editable: false });
@@ -509,7 +510,7 @@ function dayActions(view, date, info) {
 }
 
 function calendarScreen(view, { editable }) {
-  return `<header class="topbar"><span class="brand">しずく</span></header>
+  return `
     ${heroHTML(view, editable)}
     ${monthHTML(view, pillCtx(view, editable))}
     ${dayHTML(view, editable)}

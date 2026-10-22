@@ -1,9 +1,14 @@
 // オフラインでも開けるようにするのと、通知を表示するためのもの
-const CACHE = 'shizuku-v4';
+const CACHE = 'shizuku-v5';
 const SHELL = [
   './', './index.html', './css/style.css', './manifest.webmanifest',
   './js/app.js', './js/cycle.js', './js/pill.js', './js/icons.js', './js/config.js', './js/store-demo.js', './js/store-firebase.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/badge-96.png',
+  './js/switch.js', './css/switch.css',
+  './memori/', './memori/index.html', './memori/css/style.css',
+  './memori/js/app.js', './memori/js/calc.js', './memori/js/items.js', './memori/js/icons.js', './memori/js/photo.js',
+  './memori/js/store-demo.js', './memori/js/store-firebase.js',
+  './memori/icons/icon-192.png', './memori/icons/badge-96.png',
 ];
 const CDN_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com', 'www.gstatic.com'];
 
@@ -14,7 +19,7 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('shizuku-') && k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -32,7 +37,7 @@ self.addEventListener('fetch', (e) => {
           if (res.ok) caches.open(CACHE).then((c) => c.put(req, res.clone()));
           return res;
         })
-        .catch(() => caches.match(req, { ignoreSearch: true }).then((r) => r || caches.match('./index.html'))),
+        .catch(() => caches.match(req, { ignoreSearch: true }).then((r) => r || caches.match(url.pathname.includes('/memori/') ? './memori/index.html' : './index.html'))),
     );
     return;
   }
@@ -53,15 +58,17 @@ self.addEventListener('push', (e) => {
   try { payload = e.data ? e.data.json() : {}; } catch { payload = { body: e.data && e.data.text() }; }
   const d = payload.data || payload.notification || payload;
   const isPill = d.tag === 'pill' && /^\d{4}-\d{2}-\d{2}$/.test(d.date || '');
+  const weigh = d.tag === 'weigh';
+  const memori = weigh || /\/memori\//.test(d.url || '');
   e.waitUntil(
     self.registration.showNotification(d.title || 'しずく', {
       body: d.body || '',
-      icon: 'icons/icon-192.png',
-      badge: 'icons/badge-96.png',
+      icon: memori ? 'memori/icons/icon-192.png' : 'icons/icon-192.png',
+      badge: memori ? 'memori/icons/badge-96.png' : 'icons/badge-96.png',
       tag: d.tag || undefined,
       renotify: isPill,
-      actions: isPill ? [{ action: 'taken', title: '飲んだ' }] : [],
-      data: { url: d.url || './', date: isPill ? d.date : null },
+      actions: isPill ? [{ action: 'taken', title: '飲んだ' }] : weigh ? [{ action: 'record', title: '記録する' }] : [],
+      data: { url: d.url || './', date: isPill ? d.date : null, weigh },
     }),
   );
 });
@@ -72,12 +79,15 @@ self.addEventListener('notificationclick', (e) => {
   const target = new URL(data.url || './', self.registration.scope);
   // 「飲んだ」ボタン:アプリを開いて、その日の記録をつける
   if (e.action === 'taken' && data.date) target.searchParams.set('pill', data.date);
+  // 体重の通知:アプリを開いて、記録する画面を出す
+  if (data.weigh) target.searchParams.set('record', '1');
   const url = target.href;
+  const move = target.search !== '' || target.pathname.includes('/memori/');
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       const open = list.find((c) => c.url.startsWith(self.registration.scope));
       if (open) {
-        if (e.action === 'taken' && 'navigate' in open) return open.navigate(url).then((c) => (c || open).focus());
+        if ((move || !open.url.startsWith(target.origin + target.pathname)) && 'navigate' in open) return open.navigate(url).then((c) => (c || open).focus());
         return open.focus();
       }
       return self.clients.openWindow(url);

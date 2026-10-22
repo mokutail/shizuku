@@ -1,7 +1,7 @@
 {
   "name": "しずく",
   "short_name": "しずく",
-  "description": "生理の記録と予測",
+  "description": "生理・ピル・体重・健康診断の記録",
   "lang": "ja",
   "start_url": "./",
   "scope": "./",
@@ -9,6 +9,11 @@
   "orientation": "portrait",
   "background_color": "#fdf6f4",
   "theme_color": "#fdf6f4",
+  "id": "./",
+  "shortcuts": [
+    { "name": "体重を記録", "url": "./memori/?record=1", "icons": [{ "src": "memori/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "体重・健診", "url": "./memori/", "icons": [{ "src": "memori/icons/icon-192.png", "sizes": "192x192" }] }
+  ],
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },

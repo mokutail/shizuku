@@ -4,6 +4,7 @@ import { icon } from './icons.js';
 import { GROUPS, ITEMS, QUAL, FIND, JUDGES, judgeLevel, customKey, filledItems, valueOf, toNumber } from './items.js';
 import { round1, bmiOf, bmiLabel, sortEntries, rollingAvg, latest, niceRange } from './calc.js';
 import { compressPhoto } from './photo.js';
+import { appSwitch } from '../../js/switch.js';
 
 const $app = document.getElementById('app');
 const WD = ['日', '月', '火', '水', '木', '金', '土'];
@@ -80,7 +81,13 @@ const sortedCheckups = (list) => [...list].sort((a, b) => (a.date < b.date ? 1 :
 
 /* ---------- 起動 ---------- */
 async function init() {
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) {
+    // 通知とオフライン表示は「しずく」と同じしくみを使う(以前のめもり専用のものは外す)
+    navigator.serviceWorker.getRegistrations()
+      .then((regs) => Promise.all(regs.filter((r) => /\/memori\/$/.test(r.scope)).map((r) => r.unregister())))
+      .catch(() => {})
+      .finally(() => navigator.serviceWorker.register('../sw.js', { scope: '../' }).catch(() => {}));
+  }
   const params = new URLSearchParams(location.search);
   const code = params.get('invite');
   if (code) sessionStorage.setItem('memori-invite', code);
@@ -201,7 +208,7 @@ function render() {
 }
 
 function shell(main, tabs) {
-  return `<div class="shell">${S.backend && S.backend.isDemo ? '<p class="demo-band">デモモード:データはこの端末の中だけに保存されます</p>' : ''}<main class="screen">${main}</main>${tabs}</div>`;
+  return `<div class="shell">${S.backend && S.backend.isDemo ? '<p class="demo-band">デモモード:データはこの端末の中だけに保存されます</p>' : ''}<main class="screen">${appSwitch('body', '../')}${main}</main>${tabs}</div>`;
 }
 function loadingScreen() { return `<div class="center-screen"><div class="logo-rule pulse">${miniRule()}</div></div>`; }
 function centerMsg(title, text, actions = '') {
@@ -261,7 +268,7 @@ function ownerMain() {
 function partnerMain() {
   if (S.tab === 'settings') return partnerSettings();
   if (!S.sharedReady) return loadingScreen();
-  if (!S.shared) return `<header class="topbar"><span class="brand">めもり</span></header><div class="empty">${miniRule()}<p>まだ共有された内容がありません。お相手がアプリを開くと、ここに表示されます。</p></div>`;
+  if (!S.shared) return `<div class="empty">${miniRule()}<p>まだ共有された内容がありません。お相手がアプリを開くと、ここに表示されます。</p></div>`;
   const m = model();
   if (S.tab === 'checkups' && m.show.checkups) return checkupsScreen(m);
   S.tab = 'weight';
@@ -307,7 +314,7 @@ function rulerSVG(value, goal, { W = 340 } = {}) {
 function weightScreen(m) {
   const who = m.editable ? '' : `<p class="hero-who">${esc(ownerName())}さん</p>`;
   if (!m.editable && !m.show.weight && !m.show.waist && !m.show.goal) {
-    return `<header class="topbar"><span class="brand">めもり</span></header><div class="empty">${miniRule()}<p>体重は共有されていません。</p></div>`;
+    return `<div class="empty">${miniRule()}<p>体重は共有されていません。</p></div>`;
   }
   const e = m.entries;
   const last = latest(e, 'kg');
@@ -349,7 +356,7 @@ function weightScreen(m) {
   if (!showKg) S.metric = 'waist';
   if (!hasWaist) S.metric = 'kg';
   const chart = (showKg || hasWaist) && e.length ? chartCard(m, hasWaist, showKg) : '';
-  return `<header class="topbar"><span class="brand">めもり</span></header>${hero}${chart}${historyHTML(m)}`;
+  return `${hero}${chart}${historyHTML(m)}`;
 }
 
 const RANGES = [['1m', '1か月', 31], ['3m', '3か月', 92], ['1y', '1年', 366], ['all', 'すべて', null]];

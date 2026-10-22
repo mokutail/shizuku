@@ -1,0 +1,33 @@
+/* 生理・ピル ⇄ 体重・健診 の切りかえ(両方の画面で共通) */
+.app-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 10px 0 14px;
+  padding: 4px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.05);
+  font-family: "Zen Maru Gothic", sans-serif;
+}
+.sw-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #6f6468;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.sw-item:active { background: rgba(255, 255, 255, 0.6); }
+.sw-ic { width: 18px; height: 18px; flex: none; }
+.sw-item.on { color: #fff; }
+.sw-item.on.sw-cycle { background: #dd5f78; }
+.sw-item.on.sw-body { background: #2b8a80; }
+a.sw-item.sw-cycle .sw-ic { color: #dd5f78; }
+a.sw-item.sw-body .sw-ic { color: #2b8a80; }
+.sw-item:focus-visible { outline: 3px solid #f2d27a; outline-offset: 1px; }
+@media print { .app-switch { display: none; } }

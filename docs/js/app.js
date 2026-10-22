@@ -4,7 +4,7 @@ import {
   buildShared, viewFromShared, parseBulk, SHARE_DEFAULTS, OPEN_MAX,
 } from './cycle.js';
 import { icon, dropShape, leafMark, SYMPTOMS, SYMPTOM_LABEL } from './icons.js';
-import { appSwitch } from './switch.js';
+import { appSwitch, VERSION } from './switch.js';
 import {
   PILL_TYPES, pillConf, isPillOn, pillDay, needsPill, restWindows, sheetDates, missedCount,
 } from './pill.js';
@@ -637,7 +637,7 @@ function settingsScreen() {
       <p class="group-text">${esc(S.user.email || 'デモ')}</p>
       <button class="btn ghost" data-act="signout">${icon('door')}ログアウト</button>
     </div>
-    <p class="fine">予定日は、最近6回の周期の平均から計算しています。体のことで気になることがあれば、婦人科で相談してください。</p>`;
+    <p class="fine">アプリの版:${VERSION}<br>予定日は、最近6回の周期の平均から計算しています。体のことで気になることがあれば、婦人科で相談してください。</p>`;
 }
 
 function partnerSettings() {

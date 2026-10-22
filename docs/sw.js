@@ -1,5 +1,5 @@
 // オフラインでも開けるようにするのと、通知を表示するためのもの
-const CACHE = 'shizuku-v5';
+const CACHE = 'shizuku-v6';
 const SHELL = [
   './', './index.html', './css/style.css', './manifest.webmanifest',
   './js/app.js', './js/cycle.js', './js/pill.js', './js/icons.js', './js/config.js', './js/store-demo.js', './js/store-firebase.js',
@@ -31,8 +31,9 @@ self.addEventListener('fetch', (e) => {
 
   if (url.origin === self.location.origin) {
     // 自分のファイル:新しいものを優先し、つながらないときは保存分
+    // 'no-cache':ブラウザに残った古いファイルを使わず、毎回新しいものか確認する
     e.respondWith(
-      fetch(req)
+      fetch(req, { cache: 'no-cache' })
         .then((res) => {
           if (res.ok) caches.open(CACHE).then((c) => c.put(req, res.clone()));
           return res;

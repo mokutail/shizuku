@@ -4,7 +4,7 @@ import { icon } from './icons.js';
 import { GROUPS, ITEMS, QUAL, FIND, JUDGES, judgeLevel, customKey, filledItems, valueOf, toNumber } from './items.js';
 import { round1, bmiOf, bmiLabel, sortEntries, rollingAvg, latest, niceRange } from './calc.js';
 import { compressPhoto } from './photo.js';
-import { appSwitch } from '../../js/switch.js';
+import { appSwitch, VERSION } from '../../js/switch.js';
 
 const $app = document.getElementById('app');
 const WD = ['日', '月', '火', '水', '木', '金', '土'];
@@ -725,7 +725,7 @@ function settingsScreen() {
       <button class="btn ghost" data-act="demo-reset">サンプルの記録にもどす</button></div></div>` : ''}
     <div class="group"><h2 class="group-title">アカウント</h2><p class="group-text">${esc(S.user.email || 'デモ')}</p>
       <button class="btn ghost" data-act="signout">${icon('door')}ログアウト</button></div>
-    <p class="fine">数値や判定について気になることがあれば、健診を受けたところや、かかりつけの医療機関に相談してください。</p>`;
+    <p class="fine">アプリの版:${VERSION}<br>数値や判定について気になることがあれば、健診を受けたところや、かかりつけの医療機関に相談してください。</p>`;
 }
 function partnerSettings() {
   return `<header class="topbar"><h1 class="page-title">設定</h1></header>

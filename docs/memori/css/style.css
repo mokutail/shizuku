@@ -313,3 +313,20 @@ input[type="date"].field, input[type="time"].field { min-height: 46px; }
   .rows.with-prev .row, .rows-head { grid-template-columns: 1fr 80px 66px 44px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* 写真から読み取り */
+.ocr-btn { margin-top: 10px; }
+.ocr-bar { height: 10px; border-radius: 99px; background: var(--paper-2); overflow: hidden; margin: 6px 0 12px; }
+.ocr-bar i { display: block; height: 100%; width: 0; background: var(--teal); border-radius: 99px; transition: width .25s ease; }
+.ocr-list { border-top: 1px solid var(--line); margin-top: 4px; }
+.ocr-row { display: grid; grid-template-columns: 34px 1fr 96px 34px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.ocr-row:not(.on) .ocr-label, .ocr-row:not(.on) .ocr-val { opacity: .5; }
+.ocr-check { width: 30px; height: 30px; border-radius: 9px; border: 2px solid var(--line); display: grid; place-items: center; color: #fff; }
+.ocr-row.on .ocr-check { background: var(--teal); border-color: var(--teal); }
+.ocr-check .ic { width: 18px; height: 18px; stroke-width: 2.6; }
+.ocr-label { font-size: 13.5px; font-weight: 700; line-height: 1.35; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.ocr-label small { font-weight: 500; font-size: 11.5px; color: var(--ink-2); }
+.unsure { font-size: 11px; color: #8f4a12; background: var(--apricot-wash); border-radius: 6px; padding: 0 6px; }
+.ocr-val { padding: 7px 10px; font-size: 15px; }
+.ocr-plain { font-weight: 700; text-align: right; }
+.ocr-j { display: grid; place-items: center; }

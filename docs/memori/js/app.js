@@ -5,6 +5,7 @@ import { GROUPS, ITEMS, QUAL, FIND, JUDGES, judgeLevel, customKey, filledItems, 
 import { round1, bmiOf, bmiLabel, sortEntries, rollingAvg, latest, niceRange } from './calc.js';
 import { compressPhoto } from './photo.js';
 import { appSwitch, VERSION } from '../../js/switch.js';
+import { readSheets } from './ocr.js';
 
 const $app = document.getElementById('app');
 const WD = ['日', '月', '火', '水', '木', '金', '土'];
@@ -624,7 +625,8 @@ function checkupEdit(d) {
     <h2 class="sub-title">結果用紙の写真</h2>
     <div class="photo-edit">${photos}
       <label class="add-photo">${icon('camera')}<span>写真を追加</span><input type="file" accept="image/*" data-photo hidden></label></div>
-    <p class="fine">写真は自分だけが見られます(共有されません)。</p>
+    ${d.photos.length ? `<button class="btn soft wide ocr-btn" data-act="ocr">${icon('scan')}写真から結果を読み取る</button>` : ''}
+    <p class="fine">写真は自分だけが見られます(共有されません)。読み取りもスマホの中だけで行います。用紙がまっすぐ・明るく写っていると、読み取りやすくなります。</p>
 
     <h2 class="sub-title">検査の結果</h2>
     <p class="fine tight">結果用紙にある項目だけ入れれば大丈夫です。判定(A〜F)はボタンからえらびます。</p>
@@ -768,6 +770,7 @@ function modalHTML() {
       <button class="btn ghost wide" data-act="judge-set" data-v="">判定なし</button>`);
   }
   if (m.kind === 'trend') return wrap(trendHTML(m.key), 'tall');
+  if (m.kind === 'ocr') return wrap(ocrHTML(m), 'tall');
   if (m.kind === 'photo') {
     const ph = (S.photos[m.ck] || [])[m.i];
     if (!ph) return '';
@@ -938,6 +941,9 @@ document.addEventListener('click', async (ev) => {
       break;
     }
     case 'ck-save': saveCheckup(); break;
+    case 'ocr': runOcr(); break;
+    case 'ocr-pick': { const k = el.dataset.key; S.modal.picks[k] = !S.modal.picks[k]; render(); break; }
+    case 'ocr-apply': applyOcr(); break;
     case 'ck-del': {
       const id = draft.id;
       S.modal = { kind: 'confirm', title: 'この健診の結果を消しますか?', text: '入力した数値と写真がすべて消えます。', ok: '消す',
@@ -1000,6 +1006,7 @@ document.addEventListener('input', (ev) => {
   if (t.dataset.val && draft) { const k = t.dataset.val; draft.values[k] = { ...(draft.values[k] || { j: '' }), v: t.value.trim() }; return; }
   if (t.dataset.ck && draft) { draft[t.dataset.ck] = t.value; return; }
   if (t.dataset.cust && draft) { draft.custom[Number(t.dataset.cust)][t.dataset.f] = t.value; return; }
+  if (t.dataset.ocr && S.modal && S.modal.kind === 'ocr' && S.modal.result) { S.modal.result.values[t.dataset.ocr].v = t.value.trim(); return; }
   if (t.dataset.entry && S.modal && S.modal.kind === 'entry') {
     const f = t.dataset.entry;
     if (f === 'kg') {
@@ -1042,6 +1049,88 @@ document.addEventListener('change', async (ev) => {
 document.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape' && S.modal) { S.modal = null; render(); }
 });
+
+/* ---------- 写真から読み取る ---------- */
+async function runOcr() {
+  const d = S.view.draft;
+  if (!d.photos.length) return;
+  S.modal = { kind: 'ocr', msg: '読み取りの準備をしています', p: 0 };
+  render();
+  let last = 0;
+  try {
+    const result = await readSheets(d.photos.map((p) => p.data), S.today, (msg, p) => {
+      if (!S.modal || S.modal.kind !== 'ocr') return;
+      S.modal.msg = msg; S.modal.p = p;
+      const now = Date.now();
+      if (now - last > 250) { last = now; const bar = $app.querySelector('.ocr-bar i'); const txt = $app.querySelector('.ocr-msg'); if (bar) bar.style.width = `${Math.round(p * 100)}%`; if (txt) txt.textContent = msg; }
+    });
+    if (!S.modal || S.modal.kind !== 'ocr') return;
+    const picks = {};
+    for (const [k, v] of Object.entries(result.values)) {
+      const cur = d.values[k];
+      picks[k] = !cur || !cur.v || cur.v === v.v;
+    }
+    if (result.date) picks._date = result.date !== d.date && !d.id;
+    if (result.overall) picks._overall = !d.overall;
+    S.modal = { kind: 'ocr', result, picks };
+  } catch (e) {
+    console.error(e);
+    S.modal = { kind: 'ocr', error: (e && e.message) || '読み取れませんでした。' };
+  }
+  render();
+}
+
+function ocrHTML(m) {
+  const head = `<div class="sheet-head"><h2 id="mt" class="sheet-title">写真から読み取り</h2><button class="icon-btn" data-act="modal-close" aria-label="とじる">${icon('close')}</button></div>`;
+  if (m.error) return `${head}<p class="sheet-text">${esc(m.error)}</p><button class="btn ghost wide" data-act="modal-close">とじる</button>`;
+  if (!m.result) {
+    return `${head}<p class="ocr-msg sheet-text">${esc(m.msg)}</p><div class="ocr-bar"><i style="width:${Math.round((m.p || 0) * 100)}%"></i></div>
+      <p class="fine">写真はスマホの外に送っていません。1枚あたり数十秒かかることがあります。</p>`;
+  }
+  const r = m.result;
+  const keys = Object.keys(r.values);
+  if (!keys.length && !r.date) {
+    return `${head}<p class="sheet-text">項目を読み取れませんでした。明るい場所で、用紙が画面いっぱいにまっすぐ写るように撮りなおすと、読み取れることがあります。</p>
+      <button class="btn ghost wide" data-act="modal-close">とじる</button>`;
+  }
+  const draft = S.view.draft;
+  const order = Object.keys(ITEMS);
+  keys.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  const pick = (k, on, inner) => `<div class="ocr-row ${on ? 'on' : ''}">
+      <button class="ocr-check" data-act="ocr-pick" data-key="${k}" role="checkbox" aria-checked="${on}" aria-label="反映する">${on ? icon('check') : ''}</button>${inner}</div>`;
+  const rows = keys.map((k) => {
+    const it = ITEMS[k]; const v = r.values[k]; const cur = draft.values[k];
+    return pick(k, m.picks[k], `<span class="ocr-label">${esc(it.label)}${v.check ? '<span class="unsure">要確認</span>' : ''}
+        ${cur && cur.v && cur.v !== v.v ? `<small>いまの値 ${esc(cur.v)}</small>` : ''}</span>
+      <input class="field num ocr-val" data-keep="ocr-${k}" data-ocr="${k}" value="${esc(v.v)}" aria-label="${esc(it.label)}の値">
+      <span class="ocr-j">${v.j ? judge(v.j) : ''}</span>`);
+  }).join('');
+  const n = Object.entries(m.picks).filter(([, on]) => on).length;
+  return `${head}
+    <p class="sheet-text">写真と見くらべて、合っているものにチェックを入れてください。数字はここで直せます。「要確認」は読み取りがあやしいものです。</p>
+    ${r.date ? pick('_date', m.picks._date, `<span class="ocr-label">受けた日</span><span class="ocr-plain">${ymd(r.date)}</span><span></span>`) : ''}
+    ${r.overall ? pick('_overall', m.picks._overall, `<span class="ocr-label">総合判定</span><span class="ocr-plain"></span><span class="ocr-j">${judge(r.overall)}</span>`) : ''}
+    <div class="ocr-list">${rows}</div>
+    <p class="fine">読み取れなかった項目は、このあと手で入れてください。</p>
+    <button class="btn primary wide" data-act="ocr-apply" ${n ? '' : 'disabled'}>チェックした${n}件を入れる</button>`;
+}
+
+function applyOcr() {
+  const { result: r, picks } = S.modal;
+  const d = S.view.draft;
+  let n = 0;
+  for (const [k, v] of Object.entries(r.values)) {
+    if (!picks[k] || !v.v) continue;
+    const cur = d.values[k] || { v: '', j: '' };
+    d.values[k] = { v: v.v, j: v.j || cur.j || '' };
+    S.openGroups.add(ITEMS[k].group);
+    n++;
+  }
+  if (picks._date && r.date) { d.date = r.date; n++; }
+  if (picks._overall && r.overall) { d.overall = r.overall; n++; }
+  S.modal = null;
+  toast(`${n}件を入れました。保存する前に、写真と見くらべてください`);
+}
 
 function saveRemind(patch) {
   S.profile.remind = { ...S.profile.remind, ...patch };

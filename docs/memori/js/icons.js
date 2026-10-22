@@ -23,6 +23,7 @@ const P = {
   flag: '<path d="M6 21V4"/><path d="M6 4.5h11l-2.6 3.8L17 12H6"/>',
   trend: '<path d="M3.5 17.5l5-5 3.5 3.5 8-8"/><path d="M15 8h5v5"/>',
   compare: '<path d="M8 4v16M16 4v16"/><path d="M4 8h4M16 12h4M4 15h4"/>',
+  scan: '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M8 9h8M8 12h8M8 15h5"/>',
   photo: '<rect x="3.5" y="5" width="17" height="14" rx="3"/><circle cx="9" cy="10" r="1.7"/><path d="M4 17l5-4.5 3.5 3 3-2.5 4.5 4"/>',
 };
 

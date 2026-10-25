@@ -38,7 +38,7 @@ jobs:
             if $FB hosting:sites:create "$id" >/dev/null 2>&1; then SITE=$id; break; fi
           done
           if [ -z "$SITE" ]; then echo "サイトを作れませんでした"; $FB hosting:sites:create 8tail8-tools || true; exit 1; fi
-          echo "site: $SITE  https://$SITE.web.app/"
+          echo "::notice::site=$SITE"
           SHA=$(git -C site rev-parse HEAD)
           NOW=$(curl -fsS "https://$SITE.web.app/version.txt" 2>/dev/null || true)
           if [ "$NOW" = "$SHA" ] && [ "${{ github.event_name }}" = "schedule" ]; then echo "変更なし"; exit 0; fi

@@ -1,0 +1,53 @@
+name: tools-hosting
+
+# 8tail8 tools(mokutail/8tail8)を、しずくとは別の住所(Firebase Hosting の別サイト)に公開する。
+# しずくと同じ mokutail.github.io の中だと、Chrome がアプリを取りちがえてインストールできないため。
+on:
+  push:
+    paths:
+      - .github/workflows/tools-hosting.yml
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: mokutail/8tail8
+          path: site
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Deploy
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -u
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          PROJECT=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)).project_id)")
+          npm i -g firebase-tools@13 --no-audit --no-fund >/dev/null
+          FB="firebase --project $PROJECT --non-interactive"
+          SITE=""
+          for id in 8tail8-tools tail8-tools eighttail8-tools mokutail-tools mokutail-8tail8; do
+            if $FB hosting:sites:get "$id" >/dev/null 2>&1; then SITE=$id; break; fi
+            if $FB hosting:sites:create "$id" >/dev/null 2>&1; then SITE=$id; break; fi
+          done
+          if [ -z "$SITE" ]; then echo "サイトを作れませんでした"; $FB hosting:sites:create 8tail8-tools || true; exit 1; fi
+          echo "site: $SITE  https://$SITE.web.app/"
+          SHA=$(git -C site rev-parse HEAD)
+          NOW=$(curl -fsS "https://$SITE.web.app/version.txt" 2>/dev/null || true)
+          if [ "$NOW" = "$SHA" ] && [ "${{ github.event_name }}" = "schedule" ]; then echo "変更なし"; exit 0; fi
+          cd site
+          echo "$SHA" > version.txt
+          cat > firebase.json <<JSON
+          {"hosting":{"site":"$SITE","public":".","cleanUrls":false,
+            "ignore":["firebase.json",".git/**",".github/**","README.md"],
+            "headers":[{"source":"**","headers":[{"key":"Cache-Control","value":"no-cache"}]}]}}
+          JSON
+          $FB deploy --only hosting:$SITE --message "$SHA"
+          echo "公開しました: https://$SITE.web.app/"

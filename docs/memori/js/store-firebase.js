@@ -7,7 +7,7 @@ export const PROFILE_DEFAULTS = {
   height: null,
   goal: null,
   remind: { on: false, time: '07:30', skipIfRecorded: false },
-  share: { weight: true, waist: false, goal: false, checkups: false },
+  share: { weight: true, waist: false, thigh: false, arm: false, goal: false, checkups: false },
   mode: 'owner',
   following: null,
 };
@@ -107,8 +107,9 @@ export async function createFirebaseBackend(config, vapidKey) {
     },
     async setWeight(date, data) {
       const ref = doc(db, 'users', me(), 'weights', date);
-      if (data.kg == null && data.waist == null) await deleteDoc(ref);
-      else await setDoc(ref, { kg: data.kg ?? null, waist: data.waist ?? null });
+      const rec = { kg: data.kg ?? null, waist: data.waist ?? null, thigh: data.thigh ?? null, arm: data.arm ?? null };
+      if (Object.values(rec).every((v) => v == null)) await deleteDoc(ref);
+      else await setDoc(ref, rec);
     },
     async saveCheckup(ck) {
       const { id, ...data } = ck;

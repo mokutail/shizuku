@@ -20,10 +20,13 @@ export function bmiLabel(b) {
   return '肥満(4度)';
 }
 
-/** entries: [{date, kg, waist}] を日付順に */
+/** 体重といっしょに記録するサイズ(cm) */
+export const SIZES = [['waist', 'ウエスト'], ['thigh', '太もも'], ['arm', '二の腕']];
+
+/** entries: [{date, kg, waist, thigh, arm}] を日付順に */
 export function sortEntries(map) {
   return Object.entries(map || {})
-    .map(([date, v]) => ({ date, kg: v.kg ?? null, waist: v.waist ?? null }))
+    .map(([date, v]) => ({ date, kg: v.kg ?? null, waist: v.waist ?? null, thigh: v.thigh ?? null, arm: v.arm ?? null }))
     .sort((a, b) => (a.date < b.date ? -1 : 1));
 }
 

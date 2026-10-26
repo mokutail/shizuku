@@ -2,7 +2,7 @@ import { firebaseConfig, vapidKey } from '../../js/config.js';
 import { addDays, diffDays, todayIn, toNum } from '../../js/cycle.js';
 import { icon } from './icons.js';
 import { GROUPS, ITEMS, QUAL, FIND, JUDGES, judgeLevel, customKey, filledItems, valueOf, toNumber } from './items.js';
-import { round1, bmiOf, bmiLabel, sortEntries, rollingAvg, latest, niceRange } from './calc.js';
+import { round1, bmiOf, bmiLabel, sortEntries, rollingAvg, latest, niceRange, SIZES } from './calc.js';
 import { compressPhoto } from './photo.js';
 import { appSwitch, VERSION } from '../../js/switch.js';
 import { readSheets } from './ocr.js';
@@ -61,20 +61,20 @@ function model() {
       entries: sortEntries(S.weights),
       goal: S.profile.goal, height: S.profile.height,
       checkups: S.checkups,
-      show: { weight: true, waist: true, goal: true, checkups: true },
+      show: { weight: true, waist: true, thigh: true, arm: true, goal: true, checkups: true },
     };
   }
   const d = (S.shared && S.shared.data) || {};
   const items = (S.shared && S.shared.items) || {};
   const map = {};
-  (d.weights || []).forEach(([date, kg]) => { map[date] = { kg, waist: null }; });
-  (d.waists || []).forEach(([date, w]) => { map[date] = { ...(map[date] || { kg: null }), waist: w }; });
+  (d.weights || []).forEach(([date, kg]) => { map[date] = { kg }; });
+  SIZES.forEach(([k]) => (d[`${k}s`] || []).forEach(([date, v]) => { map[date] = { ...(map[date] || {}), [k]: v }; }));
   return {
     editable: false,
     entries: sortEntries(map),
     goal: d.goal ?? null, height: d.height ?? null,
     checkups: d.checkups || [],
-    show: { weight: !!items.weight, waist: !!items.waist, goal: !!items.goal, checkups: !!items.checkups },
+    show: { weight: !!items.weight, waist: !!items.waist, thigh: !!items.thigh, arm: !!items.arm, goal: !!items.goal, checkups: !!items.checkups },
   };
 }
 
@@ -176,7 +176,7 @@ function syncShared() {
     const list = sortEntries(S.weights).filter((e) => e.date >= from);
     const data = {};
     if (f.weight) data.weights = list.filter((e) => e.kg != null).map((e) => [e.date, e.kg]);
-    if (f.waist) data.waists = list.filter((e) => e.waist != null).map((e) => [e.date, e.waist]);
+    SIZES.forEach(([k]) => { if (f[k]) data[`${k}s`] = list.filter((e) => e[k] != null).map((e) => [e.date, e[k]]); });
     if (f.goal) { data.goal = S.profile.goal ?? null; data.height = S.profile.height ?? null; }
     if (f.checkups) data.checkups = S.checkups.map(({ id, date, place, overall, values, custom }) => ({ id, date, place: place || '', overall: overall || '', values: values || {}, custom: custom || [] }));
     const obj = { ownerName: S.profile.name || '', items: { ...f }, data };
@@ -314,7 +314,7 @@ function rulerSVG(value, goal, { W = 340 } = {}) {
 /* ---------- 体重 ---------- */
 function weightScreen(m) {
   const who = m.editable ? '' : `<p class="hero-who">${esc(ownerName())}さん</p>`;
-  if (!m.editable && !m.show.weight && !m.show.waist && !m.show.goal) {
+  if (!m.editable && !m.show.weight && !SIZES.some(([k]) => m.show[k]) && !m.show.goal) {
     return `<div class="empty">${miniRule()}<p>体重は共有されていません。</p></div>`;
   }
   const e = m.entries;
@@ -352,17 +352,18 @@ function weightScreen(m) {
       ${m.goal ? `<p class="goal-line">${icon('flag')}目標 ${f1(m.goal)}kg</p>` : ''}</section>`;
   }
 
-  const hasWaist = e.some((x) => x.waist != null) && (m.editable || m.show.waist);
-  const showKg = m.editable || m.show.weight;
-  if (!showKg) S.metric = 'waist';
-  if (!hasWaist) S.metric = 'kg';
-  const chart = (showKg || hasWaist) && e.length ? chartCard(m, hasWaist, showKg) : '';
+  // グラフに出せる項目(体重と、記録があるサイズ)
+  const metrics = [];
+  if (m.editable || m.show.weight) metrics.push(['kg', '体重']);
+  SIZES.forEach(([k, l]) => { if ((m.editable || m.show[k]) && e.some((x) => x[k] != null)) metrics.push([k, l]); });
+  if (!metrics.some(([k]) => k === S.metric)) S.metric = metrics.length ? metrics[0][0] : 'kg';
+  const chart = metrics.length && e.length ? chartCard(m, metrics) : '';
   return `${hero}${chart}${historyHTML(m)}`;
 }
 
 const RANGES = [['1m', '1か月', 31], ['3m', '3か月', 92], ['1y', '1年', 366], ['all', 'すべて', null]];
 
-function chartCard(m, hasWaist, showKg) {
+function chartCard(m, metrics) {
   const field = S.metric;
   const unit = 'kg' === field ? 'kg' : 'cm';
   const range = RANGES.find((r) => r[0] === S.range) || RANGES[1];
@@ -373,11 +374,10 @@ function chartCard(m, hasWaist, showKg) {
   const avg = field === 'kg' ? rollingAvg(m.entries, 'kg').filter((x) => x.date >= from) : [];
   const goal = field === 'kg' && (m.editable || m.show.goal) ? m.goal : null;
   CHARTS.main = { pts, avg, goal, from, to: S.today, unit, field };
-  const label = field === 'kg' ? '体重' : 'ウエスト';
+  const label = (metrics.find(([k]) => k === field) || [0, '体重'])[1];
   const segs = RANGES.map(([k, l]) => `<button class="seg-btn ${S.range === k ? 'on' : ''}" role="radio" aria-checked="${S.range === k}" data-act="range" data-v="${k}">${l}</button>`).join('');
-  const metricSeg = hasWaist && showKg ? `<div class="seg small" role="radiogroup" aria-label="グラフの項目">
-      <button class="seg-btn ${field === 'kg' ? 'on' : ''}" role="radio" aria-checked="${field === 'kg'}" data-act="metric" data-v="kg">体重</button>
-      <button class="seg-btn ${field === 'waist' ? 'on' : ''}" role="radio" aria-checked="${field === 'waist'}" data-act="metric" data-v="waist">ウエスト</button></div>` : `<h2 class="card-title">${label}の変化</h2>`;
+  const metricSeg = metrics.length > 1 ? `<div class="seg small" role="radiogroup" aria-label="グラフの項目">
+      ${metrics.map(([k, l]) => `<button class="seg-btn ${field === k ? 'on' : ''}" role="radio" aria-checked="${field === k}" data-act="metric" data-v="${k}">${l}</button>`).join('')}</div>` : `<h2 class="card-title">${label}の変化</h2>`;
   const legend = pts.length ? `<div class="legend">
       <span><i class="lg-dot"></i>${field === 'kg' ? '毎日の記録' : '記録'}</span>
       ${avg.length ? '<span><i class="lg-line"></i>7日平均</span>' : ''}
@@ -474,7 +474,8 @@ function bindCharts() {
 }
 
 function historyHTML(m) {
-  const list = [...m.entries].reverse().filter((x) => (m.editable || m.show.weight ? x.kg != null : false) || (x.waist != null && (m.editable || m.show.waist)));
+  const sizeOk = (k) => m.editable || m.show[k];
+  const list = [...m.entries].reverse().filter((x) => (m.editable || m.show.weight ? x.kg != null : false) || SIZES.some(([k]) => x[k] != null && sizeOk(k)));
   if (!list.length) return '';
   const shown = S.histMore ? list.slice(0, 120) : list.slice(0, 10);
   const rows = shown.map((x, i) => {
@@ -483,7 +484,7 @@ function historyHTML(m) {
     const inner = `<span class="h-date">${md(x.date)}<small>${wd(x.date)}</small></span>
       <span class="h-kg">${x.kg != null && (m.editable || m.show.weight) ? `${f1(x.kg)}<small>kg</small>` : '<span class="muted">—</span>'}</span>
       <span class="h-diff">${diff != null && diff !== 0 ? signed(diff) : ''}</span>
-      <span class="h-waist">${x.waist != null && (m.editable || m.show.waist) ? `ウエスト ${f1(x.waist)}` : ''}</span>`;
+      <span class="h-waist">${SIZES.filter(([k]) => x[k] != null && sizeOk(k)).map(([k, l]) => `<span>${l} ${f1(x[k])}</span>`).join('')}</span>`;
     return m.editable
       ? `<li><button class="h-row" data-act="entry" data-date="${x.date}" aria-label="${mdj(x.date)}の記録を直す">${inner}${icon('chevR')}</button></li>`
       : `<li><div class="h-row">${inner}</div></li>`;
@@ -660,6 +661,8 @@ function itemRow(it, val) {
 const SHARE_ITEMS = [
   ['weight', '体重の記録'],
   ['waist', 'ウエストの記録'],
+  ['thigh', '太ももの記録'],
+  ['arm', '二の腕の記録'],
   ['goal', '目標体重とBMI'],
   ['checkups', '健康診断の結果(数値と判定)'],
 ];
@@ -759,8 +762,9 @@ function modalHTML() {
         <div class="num-wrap big"><input class="field num big" data-keep="kg" data-entry="kg" inputmode="decimal" value="${m.kg != null ? m.kg.toFixed(1) : ''}" aria-label="体重"><span class="unit-label">kg</span></div>
         <button class="round-btn" data-act="kg-step" data-v="1" aria-label="0.1kg ふやす">${icon('plus')}</button>
       </div>
-      <label class="field-label" for="e-waist">ウエスト(はかった日だけ)</label>
-      <div class="num-wrap"><input id="e-waist" class="field num" data-keep="waist" data-entry="waist" inputmode="decimal" value="${m.waist ?? ''}"><span class="unit-label">cm</span></div>
+      <p class="field-label">サイズ(はかったものだけ)</p>
+      <div class="size-grid">${SIZES.map(([k, l]) => `<div><label class="size-label" for="e-${k}">${l}</label>
+        <div class="num-wrap"><input id="e-${k}" class="field num" data-keep="${k}" data-entry="${k}" inputmode="decimal" value="${m[k] ?? ''}"><span class="unit-label">cm</span></div></div>`).join('')}</div>
       <button class="btn primary wide" data-act="entry-save">保存する</button>
       ${has && !m.dateEditable ? `<button class="btn ghost wide" data-act="entry-del">${icon('trash')}この日の記録を消す</button>` : ''}`, 'tall');
   }
@@ -815,7 +819,7 @@ function openEntry(date) {
   const d = date || S.today;
   const rec = S.weights[d];
   const last = latest(sortEntries(S.weights), 'kg');
-  S.modal = { kind: 'entry', date: d, dateEditable, kg: rec && rec.kg != null ? rec.kg : last ? last.kg : null, waist: rec ? rec.waist : null, touched: !!(rec && rec.kg != null) };
+  S.modal = { kind: 'entry', date: d, dateEditable, kg: rec && rec.kg != null ? rec.kg : last ? last.kg : null, waist: rec ? rec.waist : null, thigh: rec ? rec.thigh ?? null : null, arm: rec ? rec.arm ?? null : null, touched: !!(rec && rec.kg != null) };
   render();
 }
 
@@ -873,18 +877,26 @@ document.addEventListener('click', async (ev) => {
     case 'kg-step': setKg((S.modal.kg ?? 50) + Number(el.dataset.v) * 0.1); { const f = $app.querySelector('[data-entry="kg"]'); if (f) f.value = S.modal.kg.toFixed(1); } break;
     case 'entry-save': {
       const m = S.modal;
-      const waist = toNumber(m.waist);
-      // ウエストだけ入れた日は、前回の体重をそのまま記録しない
-      const kg = m.kg != null && (m.touched || waist == null) ? m.kg : null;
-      if (kg == null && waist == null) { toast('体重かウエストを入れてください'); break; }
+      const sizes = {};
+      let bad = '';
+      SIZES.forEach(([k, l]) => {
+        const v = toNumber(m[k]);
+        if (v != null && (v < 5 || v > 200)) bad = l;
+        sizes[k] = v != null ? round1(v) : null;
+      });
+      if (bad) { toast(`${bad}の数字を確かめてください(cm)`); break; }
+      const anySize = Object.values(sizes).some((v) => v != null);
+      // サイズだけ入れた日は、前回の体重をそのまま記録しない
+      const kg = m.kg != null && (m.touched || !anySize) ? m.kg : null;
+      if (kg == null && !anySize) { toast('体重かサイズを入れてください'); break; }
       if (m.date > S.today) { toast('先の日付には記録できません'); break; }
       S.modal = null;
-      run(async () => { await b.setWeight(m.date, { kg, waist: waist != null ? round1(waist) : null }); }, `${mdj(m.date)}の記録を保存しました`);
+      run(async () => { await b.setWeight(m.date, { kg, ...sizes }); }, `${mdj(m.date)}の記録を保存しました`);
       break;
     }
     case 'entry-del': {
       const date = S.modal.date;
-      S.modal = { kind: 'confirm', title: 'この日の記録を消しますか?', text: `${mdj(date)}の体重とウエストが消えます。`, ok: '消す', onOk: () => run(() => b.setWeight(date, {}), '消しました') };
+      S.modal = { kind: 'confirm', title: 'この日の記録を消しますか?', text: `${mdj(date)}の体重とサイズの記録が消えます。`, ok: '消す', onOk: () => run(() => b.setWeight(date, {}), '消しました') };
       render();
       break;
     }
@@ -1012,11 +1024,11 @@ document.addEventListener('input', (ev) => {
     if (f === 'kg') {
       const n = toNumber(t.value);
       if (n != null && n >= 20 && n <= 250) setKg(n);
-    } else if (f === 'waist') S.modal.waist = t.value;
+    } else if (SIZES.some(([k]) => k === f)) S.modal[f] = t.value;
     else if (f === 'date' && t.value) {
       S.modal.date = t.value;
       const rec = S.weights[t.value];
-      if (rec) { S.modal.kg = rec.kg; S.modal.waist = rec.waist; S.modal.touched = rec.kg != null; render(); }
+      if (rec) { S.modal.kg = rec.kg; SIZES.forEach(([k]) => { S.modal[k] = rec[k] ?? null; }); S.modal.touched = rec.kg != null; render(); }
     }
   }
 });

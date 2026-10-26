@@ -15,7 +15,9 @@ function sample() {
     kg += -0.022 + (rnd() - 0.5) * 0.5;
     kg = Math.max(53.5, kg);
     const d = addDays(today, -i);
-    weights[d] = { kg: Math.round(kg * 10) / 10, waist: i % 14 === 0 ? Math.round((71.5 - (120 - i) * 0.015) * 10) / 10 : null };
+    weights[d] = { kg: Math.round(kg * 10) / 10, waist: i % 14 === 0 ? Math.round((71.5 - (120 - i) * 0.015) * 10) / 10 : null,
+      thigh: i < 30 ? Math.round((51.6 + i * 0.03 + Math.sin(i) * 0.2) * 10) / 10 : null,
+      arm: i < 30 ? Math.round((26.2 + i * 0.015 + Math.cos(i) * 0.15) * 10) / 10 : null };
   }
   const y = Number(today.slice(0, 4));
   const ck = (year, v, extra = {}) => ({
@@ -84,8 +86,9 @@ export function createDemoBackend() {
     async saveProfile(patch) { db.profile = mergeProfile({ ...db.profile, ...patch, remind: { ...db.profile.remind, ...(patch.remind || {}) }, share: { ...db.profile.share, ...(patch.share || {}) } }); save(); },
     watchOwnData(cb) { subs.own.add(cb); later(() => cb(snap())); return () => subs.own.delete(cb); },
     async setWeight(date, data) {
-      if (data.kg == null && data.waist == null) delete db.weights[date];
-      else db.weights[date] = { kg: data.kg ?? null, waist: data.waist ?? null };
+      const rec = { kg: data.kg ?? null, waist: data.waist ?? null, thigh: data.thigh ?? null, arm: data.arm ?? null };
+      if (Object.values(rec).every((v) => v == null)) delete db.weights[date];
+      else db.weights[date] = rec;
       save(); emitOwn();
     },
     async saveCheckup(ck) {

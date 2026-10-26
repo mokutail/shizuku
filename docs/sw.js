@@ -1,5 +1,5 @@
 // オフラインでも開けるようにするのと、通知を表示するためのもの
-const CACHE = 'shizuku-v7';
+const CACHE = 'shizuku-v8';
 const SHELL = [
   './', './index.html', './css/style.css', './manifest.webmanifest',
   './js/app.js', './js/cycle.js', './js/pill.js', './js/icons.js', './js/config.js', './js/store-demo.js', './js/store-firebase.js',
